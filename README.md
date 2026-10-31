@@ -188,7 +188,7 @@ Day and night text colours switch rather than blend, so contrast stays ≥ 4.5:1
 | ≥ 1800 px                            | Slightly taller landscape band, more bottom spacing                                                              |
 | ≤ 820 px tall (desktop)              | Compact header, smaller title and keycap                                                                         |
 | ≤ 1000 px                            | Title wraps; landscape widened past the edges (`inset: 32% -3% 160px`) so the train stays centred                |
-| 481–1000 px portrait                 | _Artura_ drops to its own line; scenery stretched vertically                                                     |
+| 481–1000 px portrait                 | _imię_ drops to its own line; scenery stretched vertically                                                     |
 | ≤ 480 px                             | Scenery stretched further; the "Zawsze bez dźwięku" label is hidden, leaving only its icon                       |
 | ≤ 600 px tall (desktop)              | Flourish hidden, everything tightened; ≤ 450 px also hides the patient note                                      |
 | Touch                                | Big keycap, "Dotknij", invitation row wraps, footer hidden                                                       |
