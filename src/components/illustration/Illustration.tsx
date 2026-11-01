@@ -9,7 +9,7 @@ import {
 import { CelestialSky, WeatherEffects } from "../Atmosphere";
 import { Cloud, Pine, Scenery, Tree } from "./Scenery";
 import { Carriage, Locomotive } from "./Train";
-import { Station } from "./Station";
+import { LeavingDriver, Station } from "./Station";
 import { MeadowDetails } from "./Meadow";
 
 /**
@@ -139,6 +139,10 @@ export const Illustration = memo(function Illustration({
           driverOutside={driverIsOutside(journey)}
         />
       </g>
+      {/* In front of the locomotive, so the driver stepping down is not hidden
+          by the boiler. The incoming driver on the platform is drawn by
+          `Station`, behind the train, which is correct for a distant figure. */}
+      <LeavingDriver journey={journey} />
       <MeadowDetails />
       <WeatherEffects />
       <path

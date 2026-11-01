@@ -4,6 +4,7 @@ import {
   useReducer,
   useRef,
   useState,
+  type CSSProperties,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
@@ -24,6 +25,7 @@ import {
   journeyReducer,
   nextStopTeaser,
   journeyAriaAnnouncement,
+  phaseDuration,
   ALL_ANIMALS,
   type JourneySettings,
 } from "./game";
@@ -174,18 +176,38 @@ export default function App() {
 
   const world = useRef<HTMLElement | null>(null);
   const advancePhase = useCallback(() => {
+    // The next plan is prepared the moment the train arrives home, not when the
+    // goodbye ends: the incoming driver has to be waiting on the platform while
+    // the outgoing one is still getting off. `avoidDriver` keeps the hand-over
+    // visible by giving the next trip someone new.
+    // Prepared once, at the last leg of the tour, then reused through the
+    // arrival and the goodbye so the incoming driver never changes identity.
+    const preparingNextJourney =
+      !journey.pendingPlan &&
+      ((journey.phase === "touring" &&
+        journey.tourIndex === journey.plan.tour.length - 1) ||
+        journey.phase === "returning" ||
+        journey.phase === "unboarding");
     dispatch(
-      journey.phase === "unboarding"
+      preparingNextJourney
         ? {
             type: "ADVANCE",
             nextPlan: generateSessionPlan(
               Math.random,
               journey.settings.planner,
+              journey.plan.driver,
             ),
           }
         : { type: "ADVANCE" },
     );
-  }, [journey.phase, journey.settings.planner]);
+  }, [
+    journey.phase,
+    journey.tourIndex,
+    journey.plan.tour.length,
+    journey.plan.driver,
+    journey.pendingPlan,
+    journey.settings.planner,
+  ]);
   const clock = useJourneyClock(journey, advancePhase);
   const initialConditions = useAtmosphere(journey, clock, world);
   const activePlaytimeMs = useActivePlaytime(visible && !journey.isResting);
@@ -224,7 +246,11 @@ export default function App() {
   const handleResetSession = () => {
     dispatch({
       type: "RESET_SESSION",
-      plan: generateSessionPlan(Math.random, journey.settings.planner),
+      plan: generateSessionPlan(
+        Math.random,
+        journey.settings.planner,
+        journey.plan.driver,
+      ),
     });
   };
 
@@ -256,6 +282,15 @@ export default function App() {
       data-initial-hour={initialConditions.hour.toFixed(4)}
       data-initial-moon-phase={(initialConditions.moonPhase ?? 0).toFixed(4)}
       data-driver={driverIsOutside(journey) ? "outside" : "cab"}
+      data-driver-next={journey.pendingPlan?.driver ?? journey.plan.driver}
+      data-driver-leaving={journey.outgoingDriver ?? ""}
+      style={
+        {
+          "--unboarding-duration": `${(
+            phaseDuration("unboarding", journey.settings.pace) / 1000
+          ).toFixed(3)}s`,
+        } as CSSProperties
+      }
       aria-label="Mały pociąg Artura. Spokojna zabawa sterowana klawiszem Enter lub przyciskiem na ekranie."
     >
       {/* Screen Reader Live Region for Accessibility */}

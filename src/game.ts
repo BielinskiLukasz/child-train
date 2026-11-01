@@ -270,6 +270,8 @@ export const defaultPlanner: JourneyPlanner = {
 export function generateSessionPlan(
   random = Math.random,
   planner: JourneyPlanner = defaultPlanner,
+  /** The driver who just finished, so the next one is visibly someone new. */
+  avoidDriver?: AnimalKind,
 ): SessionPlan {
   /**
    * Assigns one distinct value per slot. Explicit picks win, in order. A
@@ -307,10 +309,27 @@ export function generateSessionPlan(
     return result;
   };
 
-  const [driver, ...passengers] = assign<AnimalKind>(
+  const [firstAnimal, ...passengers] = assign<AnimalKind>(
     [planner.driver, ...planner.passengers],
     ANIMAL_KEYS,
   );
+  let driver = firstAnimal;
+
+  // A different driver takes over at Artur's station, so the hand-over is
+  // visible. Only when the parent left the choice to chance: an explicit pick
+  // is always honoured, even if it repeats the previous driver.
+  if (
+    avoidDriver &&
+    planner.driver === "random" &&
+    driver === avoidDriver &&
+    passengers.length > 0
+  ) {
+    const swapIndex = passengers.findIndex((kind) => kind !== avoidDriver);
+    if (swapIndex !== -1) {
+      [driver, passengers[swapIndex]] = [passengers[swapIndex], driver];
+    }
+  }
+
   const tour = assign<Landscape>(planner.stations, DESTINATION_LOCATIONS);
 
   const stops: StopDefinition[] = [
@@ -349,6 +368,18 @@ export interface JourneyState {
   isTour: boolean;
   journeys: number;
   plan: SessionPlan;
+  /**
+   * The driver whose trip has just ended. Kept while the train is parked at
+   * Artur's station so they can be seen stepping down and walking off, rather
+   * than being silently swapped for the next driver.
+   */
+  outgoingDriver: AnimalKind | null;
+  /**
+   * The next journey's plan, prepared as soon as the train arrives home. It
+   * gives the incoming driver to the platform while the old one is still
+   * saying goodbye.
+   */
+  pendingPlan: SessionPlan | null;
   isResting: boolean;
   restReason: "rounds" | "playtime" | "parent" | null;
   settings: JourneySettings;
@@ -367,6 +398,8 @@ export function createInitialJourney(
     isTour: false,
     journeys,
     plan,
+    outgoingDriver: null,
+    pendingPlan: null,
     isResting: false,
     restReason: null,
     settings: { ...settings },
@@ -421,12 +454,29 @@ export function journeyReducer(
         case "touring":
           return state.tourIndex < state.plan.tour.length - 1
             ? { ...state, tourIndex: state.tourIndex + 1 }
-            : { ...state, phase: "returning", stop: 0 };
+            : // Heading home: stash the next plan so the incoming driver is
+              // already standing on the platform as the station slides in.
+              {
+                ...state,
+                phase: "returning",
+                stop: 0,
+                pendingPlan: state.pendingPlan ?? action.nextPlan ?? null,
+              };
         case "returning":
-          return { ...state, phase: "unboarding" };
+          // Arriving home: remember who drove this trip and show the next
+          // driver already waiting on the platform.
+          return {
+            ...state,
+            phase: "unboarding",
+            outgoingDriver: state.plan.driver,
+            // Never replace a plan that is already on the platform: the
+            // incoming driver must stay the same animal for the whole goodbye.
+            pendingPlan: state.pendingPlan ?? action.nextPlan ?? null,
+          };
         case "unboarding": {
           // Generate entropy before dispatch; reducers must stay replayable.
-          if (!action.nextPlan) return state;
+          const nextPlan = state.pendingPlan ?? action.nextPlan;
+          if (!nextPlan) return state;
           const nextJourneys = state.journeys + 1;
           const shouldRest =
             state.settings.roundsBeforeRest > 0 &&
@@ -440,7 +490,9 @@ export function journeyReducer(
             tourIndex: 0,
             isTour: false,
             journeys: nextJourneys,
-            plan: action.nextPlan,
+            plan: nextPlan,
+            outgoingDriver: null,
+            pendingPlan: null,
             isResting: shouldRest,
             restReason: shouldRest ? "rounds" : null,
           };
@@ -474,9 +526,10 @@ export function journeyReducer(
 }
 
 /**
- * The driver stays in the cab everywhere except Artur's own station, where
- * they step out onto the platform while the train is parked (before the first
- * journey, and again when everyone says goodbye). Pure: derived from state only.
+ * True while the cab is empty: the locomotive has no one at the controls
+ * because the driver is on the platform at Artur's station. Covers the wait
+ * before departure and the moment everyone steps off after arriving home.
+ * Pure: derived from state only.
  */
 export function driverIsOutside(state: JourneyState): boolean {
   return (
@@ -484,6 +537,25 @@ export function driverIsOutside(state: JourneyState): boolean {
     !state.isTour &&
     (state.phase === "waiting" || state.phase === "unboarding")
   );
+}
+
+/**
+ * The driver waiting on the platform to take the next trip. While the previous
+ * driver is still getting off, this is already the *incoming* one, so the
+ * platform shows a genuine hand-over instead of replacing whoever is standing
+ * there.
+ */
+export function waitingDriver(state: JourneyState): AnimalKind {
+  // Once the next plan is ready — from the moment the train heads home — the
+  // platform belongs to the incoming driver, not the one still at the controls.
+  return state.pendingPlan?.driver ?? state.plan.driver;
+}
+
+/** The driver stepping down after arriving home; null at any other moment. */
+export function leavingDriver(state: JourneyState): AnimalKind | null {
+  return state.stop === 0 && state.phase === "unboarding"
+    ? (state.outgoingDriver ?? state.plan.driver)
+    : null;
 }
 
 export function currentLandscape(state: JourneyState): Landscape {

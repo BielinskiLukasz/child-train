@@ -92,6 +92,7 @@
 /* The driver climbing out of the cab at Artur's station.
    Starts up at cab height and settles onto the platform, so the move reads as
    stepping down out of the locomotive rather than appearing. */
+/* The incoming driver waits on the platform; on Enter they rise into the cab. */
 .platform-driver {
   opacity: 0;
   transform: translateY(-58px);
@@ -100,10 +101,36 @@
     transform 1.25s cubic-bezier(0.22, 0.61, 0.36, 1) 0.3s;
 }
 
-.platform-driver.is-out {
+.platform-driver.is-waiting {
   opacity: 1;
   transform: translateY(0);
   transition-delay: 0s;
+}
+
+/* The driver whose trip just ended steps down out of the cab and walks off
+   towards the station, so the hand-over is visible. Timed to the unboarding
+   phase, which the parent pace setting scales. */
+.leaving-driver {
+  animation: driver-hand-over var(--unboarding-duration, 2.4s) ease-in-out both;
+}
+
+@keyframes driver-hand-over {
+  0% {
+    opacity: 0;
+    transform: translateY(-56px);
+  }
+  18% {
+    opacity: 1;
+  }
+  34%,
+  58% {
+    opacity: 1;
+    transform: translateY(0) translateX(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(0) translateX(-220px);
+  }
 }
 
 .cab-driver {
@@ -123,6 +150,13 @@
   .cab-driver {
     transition-duration: 0.001ms !important;
     transition-delay: 0s !important;
+  }
+  /* The outgoing driver stays on the platform rather than walking off; the
+     figure unmounts when the goodbye ends, so nobody is left behind. */
+  .leaving-driver {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
   }
 }
 
