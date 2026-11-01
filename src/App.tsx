@@ -4,7 +4,6 @@ import {
   useReducer,
   useRef,
   useState,
-  type CSSProperties,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
@@ -25,12 +24,18 @@ import {
   journeyReducer,
   nextStopTeaser,
   journeyAriaAnnouncement,
-  phaseDuration,
   ALL_ANIMALS,
+  normalizeChildName,
   type JourneySettings,
 } from "./game";
 
-function SunMark({ onLongPressTrigger }: { onLongPressTrigger?: () => void }) {
+function SunMark({
+  productName,
+  onLongPressTrigger,
+}: {
+  productName: string;
+  onLongPressTrigger?: () => void;
+}) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const startPress = () => {
@@ -57,7 +62,7 @@ function SunMark({ onLongPressTrigger }: { onLongPressTrigger?: () => void }) {
       onPointerLeave={cancelPress}
       onClick={(event) => event.preventDefault()}
       onContextMenu={(event) => event.preventDefault()}
-      aria-label="Mały pociąg Artura. Przytrzymaj 3 sekundy, aby otworzyć ustawienia rodzica."
+      aria-label={`${productName}. Przytrzymaj 3 sekundy, aby otworzyć ustawienia rodzica.`}
       title="Przytrzymaj 3 sekundy, aby otworzyć panel rodzica"
     >
       <svg
@@ -121,8 +126,18 @@ export default function App() {
   const waiting = journey.phase === "waiting" && !journey.isResting;
   const landscape = currentLandscape(journey);
   const currentSt = currentStop(journey);
-  const driverAnimal = ALL_ANIMALS[journey.plan.driver];
+  const childName = normalizeChildName(journey.settings.childName);
+  const productName = `Mały pociąg ${childName}`;
+  const activeDriverKind =
+    journey.phase === "unboarding" && journey.returningDriver
+      ? journey.returningDriver
+      : journey.plan.driver;
+  const driverAnimal = ALL_ANIMALS[activeDriverKind];
   const teaser = nextStopTeaser(journey);
+
+  useLayoutEffect(() => {
+    document.title = productName;
+  }, [productName]);
 
   // Keyboard navigation. Native dialogs own Escape while they are open.
   useLayoutEffect(() => {
@@ -176,36 +191,33 @@ export default function App() {
 
   const world = useRef<HTMLElement | null>(null);
   const advancePhase = useCallback(() => {
-    // The next plan is prepared the moment the train arrives home, not when the
-    // goodbye ends: the incoming driver has to be waiting on the platform while
-    // the outgoing one is still getting off. `avoidDriver` keeps the hand-over
-    // visible by giving the next trip someone new.
-    // Prepared once, at the last leg of the tour, then reused through the
-    // arrival and the goodbye so the incoming driver never changes identity.
-    const preparingNextJourney =
-      !journey.pendingPlan &&
-      ((journey.phase === "touring" &&
-        journey.tourIndex === journey.plan.tour.length - 1) ||
-        journey.phase === "returning" ||
-        journey.phase === "unboarding");
-    dispatch(
-      preparingNextJourney
-        ? {
-            type: "ADVANCE",
-            nextPlan: generateSessionPlan(
-              Math.random,
-              journey.settings.planner,
-              journey.plan.driver,
-            ),
-          }
-        : { type: "ADVANCE" },
-    );
+    const isTourEnd =
+      journey.phase === "touring" &&
+      journey.tourIndex === journey.plan.tour.length - 1;
+    const isEnding =
+      isTourEnd ||
+      journey.phase === "returning" ||
+      journey.phase === "unboarding";
+
+    const nextPlan = isEnding
+      ? (journey.nextPlan ??
+        generateSessionPlan(
+          Math.random,
+          journey.settings.planner,
+          journey.plan.driver,
+        ))
+      : undefined;
+
+    dispatch({
+      type: "ADVANCE",
+      nextPlan,
+    });
   }, [
     journey.phase,
     journey.tourIndex,
     journey.plan.tour.length,
     journey.plan.driver,
-    journey.pendingPlan,
+    journey.nextPlan,
     journey.settings.planner,
   ]);
   const clock = useJourneyClock(journey, advancePhase);
@@ -246,11 +258,7 @@ export default function App() {
   const handleResetSession = () => {
     dispatch({
       type: "RESET_SESSION",
-      plan: generateSessionPlan(
-        Math.random,
-        journey.settings.planner,
-        journey.plan.driver,
-      ),
+      plan: generateSessionPlan(Math.random, journey.settings.planner),
     });
   };
 
@@ -282,16 +290,7 @@ export default function App() {
       data-initial-hour={initialConditions.hour.toFixed(4)}
       data-initial-moon-phase={(initialConditions.moonPhase ?? 0).toFixed(4)}
       data-driver={driverIsOutside(journey) ? "outside" : "cab"}
-      data-driver-next={journey.pendingPlan?.driver ?? journey.plan.driver}
-      data-driver-leaving={journey.outgoingDriver ?? ""}
-      style={
-        {
-          "--unboarding-duration": `${(
-            phaseDuration("unboarding", journey.settings.pace) / 1000
-          ).toFixed(3)}s`,
-        } as CSSProperties
-      }
-      aria-label="Mały pociąg Artura. Spokojna zabawa sterowana klawiszem Enter lub przyciskiem na ekranie."
+      aria-label={`${productName}. Spokojna zabawa sterowana klawiszem Enter lub przyciskiem na ekranie.`}
     >
       {/* Screen Reader Live Region for Accessibility */}
       <div className="sr-only" aria-live="polite" aria-atomic="true">
@@ -302,7 +301,10 @@ export default function App() {
 
       <header className="site-header flex items-center justify-between">
         {/* The hero heading carries the name, so the mark stays wordless here. */}
-        <SunMark onLongPressTrigger={() => setParentModalOpen(true)} />
+        <SunMark
+          productName={productName}
+          onLongPressTrigger={() => setParentModalOpen(true)}
+        />
         <div className="flex items-center gap-4">
           <div className="quiet-note flex items-center gap-2">
             {configuredLimitMs > 0 && (
@@ -369,7 +371,7 @@ export default function App() {
           <span />
         </div>
         <h1 id="page-title">
-          Mały pociąg <em>Artura</em>
+          Mały pociąg <em>{childName}</em>
         </h1>
         <p className="intro-subtitle">
           Maszynista: <strong>{driverAnimal.name}</strong> · Stacja:{" "}

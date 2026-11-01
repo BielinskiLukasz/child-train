@@ -1,15 +1,16 @@
 import { memo, useEffect, useRef, useState } from "react";
 import {
   ALL_ANIMALS,
-  ALL_LOCATIONS,
+  currentStop,
   driverIsOutside,
+  normalizeChildName,
   type JourneyState,
   type Landscape,
 } from "../../game";
 import { CelestialSky, WeatherEffects } from "../Atmosphere";
 import { Cloud, Pine, Scenery, Tree } from "./Scenery";
 import { Carriage, Locomotive } from "./Train";
-import { LeavingDriver, Station } from "./Station";
+import { Station } from "./Station";
 import { MeadowDetails } from "./Meadow";
 
 /**
@@ -26,7 +27,8 @@ export const Illustration = memo(function Illustration({
   journey: JourneyState;
   landscape: Landscape;
 }) {
-  const currentSt = journey.plan.stops[journey.stop] ?? ALL_LOCATIONS.home;
+  const currentSt = currentStop(journey);
+  const productName = `Mały pociąg ${normalizeChildName(journey.settings.childName)}`;
   const driverAnimal = ALL_ANIMALS[journey.plan.driver];
   const previousLandscape = useRef(landscape);
   const [leavingLandscape, setLeavingLandscape] = useState<Landscape | null>(
@@ -50,7 +52,7 @@ export const Illustration = memo(function Illustration({
       role="img"
       aria-labelledby="scene-title scene-description sky-description"
     >
-      <title id="scene-title">{`Mały pociąg Artura: ${currentSt.name}. Maszynista: ${driverAnimal.name}`}</title>
+      <title id="scene-title">{`${productName}: ${currentSt.name}. Maszynista: ${driverAnimal.name}`}</title>
       <desc id="scene-description">
         Pastelowa lokomotywa prowadzona przez maszynistę {driverAnimal.name} i
         trzy kolorowe wagoniki. W podróży towarzyszą przyjaciele zwierzątka.
@@ -135,14 +137,14 @@ export const Illustration = memo(function Illustration({
           <Carriage key={index} index={index} journey={journey} />
         ))}
         <Locomotive
-          driver={journey.plan.driver}
+          driver={
+            journey.phase === "unboarding" && journey.returningDriver
+              ? journey.returningDriver
+              : journey.plan.driver
+          }
           driverOutside={driverIsOutside(journey)}
         />
       </g>
-      {/* In front of the locomotive, so the driver stepping down is not hidden
-          by the boiler. The incoming driver on the platform is drawn by
-          `Station`, behind the train, which is correct for a distant figure. */}
-      <LeavingDriver journey={journey} />
       <MeadowDetails />
       <WeatherEffects />
       <path

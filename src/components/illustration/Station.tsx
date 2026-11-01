@@ -1,17 +1,9 @@
-import {
-  ALL_LOCATIONS,
-  leavingDriver,
-  waitingDriver,
-  type JourneyState,
-} from "../../game";
+import { currentStop, driverIsOutside, type JourneyState } from "../../game";
 import { Animal } from "./Animal";
 
 export function Station({ journey }: { journey: JourneyState }) {
   const { phase, stop } = journey;
-  const waitingDriverKind = waitingDriver(journey);
-  // The incoming driver is on the platform whenever the train is home and not
-  // pulling out — including while it is still arriving.
-  const incomingIsWaiting = stop === 0 && phase !== "departing";
+  const driverOutside = driverIsOutside(journey);
   if (phase === "travelling" || phase === "touring") return null;
 
   const arriving = phase === "arriving" || phase === "returning";
@@ -22,7 +14,7 @@ export function Station({ journey }: { journey: JourneyState }) {
 
   const roof = roofColors[stop % roofColors.length];
   const walls = wallColors[stop % wallColors.length];
-  const stopInfo = journey.plan.stops[stop] ?? ALL_LOCATIONS.home;
+  const stopInfo = currentStop(journey);
   const waitingPassenger = stop > 0 ? journey.plan.passengers[stop - 1] : null;
 
   return (
@@ -173,15 +165,34 @@ export function Station({ journey }: { journey: JourneyState }) {
         stroke="#7e936a"
         strokeWidth="1.5"
       />
-      {/* The incoming driver is already waiting here while the train pulls in,
-          and only steps up into the cab on Enter. The outgoing driver is drawn
-          separately, in front of the locomotive, by <LeavingDriver>. */}
-      {stop === 0 && (
+      {/* 1. At Artur's station during unboarding: the actual returning driver steps down at x=398 */}
+      {stop === 0 && phase === "unboarding" && (
         <g transform="translate(398 424) scale(.5)">
-          <g
-            className={`platform-driver ${incomingIsWaiting ? "is-waiting" : ""}`}
-          >
-            <Animal kind={waitingDriverKind} conductor />
+          <g className="platform-driver-leaving">
+            <Animal
+              kind={journey.returningDriver ?? journey.plan.driver}
+              conductor
+            />
+          </g>
+        </g>
+      )}
+
+      {/* 2. At Artur's station when returning or unboarding: the new driver is ALREADY waiting on the platform! */}
+      {stop === 0 &&
+        (phase === "returning" || phase === "unboarding") &&
+        journey.nextPlan && (
+          <g transform="translate(250 424) scale(.5)">
+            <g className="platform-new-driver-waiting">
+              <Animal kind={journey.nextPlan.driver} conductor />
+            </g>
+          </g>
+        )}
+
+      {/* 3. Before departure or after unboarding: the active driver is ready on the platform at x=398 */}
+      {stop === 0 && (phase === "waiting" || phase === "departing") && (
+        <g transform="translate(398 424) scale(.5)">
+          <g className={`platform-driver ${driverOutside ? "is-out" : ""}`}>
+            <Animal kind={journey.plan.driver} conductor />
           </g>
         </g>
       )}
@@ -203,24 +214,6 @@ export function Station({ journey }: { journey: JourneyState }) {
         <path d="M-8 2q2-12 12-9 8 1 6 10l8 3-10 1q-9 9-16-5Z" fill="#6f8b76" />
         <path d="m-7 1-8-3 5 7" fill="#6f8b76" />
         <circle cx="7" cy="-2" r="1.1" fill="#f6ebcd" />
-      </g>
-    </g>
-  );
-}
-
-/**
- * The driver whose trip has just ended, stepping down out of the cab and
- * walking off towards the station. Rendered by `Illustration` **after** the
- * train, because `Station` is painted behind the locomotive and a figure at cab
- * height would otherwise be hidden by it.
- */
-export function LeavingDriver({ journey }: { journey: JourneyState }) {
-  const kind = leavingDriver(journey);
-  if (!kind) return null;
-  return (
-    <g transform="translate(560 424) scale(.5)">
-      <g className="leaving-driver">
-        <Animal kind={kind} conductor />
       </g>
     </g>
   );

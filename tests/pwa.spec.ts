@@ -34,7 +34,7 @@ test("hosted PWA precaches the shell and can reopen offline after install", asyn
   await context.setOffline(true);
   const offlinePage = await context.newPage();
   await offlinePage.goto("/");
-  await expect(offlinePage.locator("h1")).toContainText("Artura");
+  await expect(offlinePage.locator("h1")).toContainText("dziecka");
   await expect(offlinePage.locator(".enter-key")).toBeVisible();
   const offlineAssets = await offlinePage.evaluate(async () => {
     const paths = [

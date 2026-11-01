@@ -7,6 +7,7 @@ import {
   PACE_PRESETS,
   defaultPlanner,
   type AnimalKind,
+  normalizeChildName,
   type JourneyPlanner,
   type JourneySettings,
   type JourneyState,
@@ -139,6 +140,29 @@ export function ParentModal({
               planner={settings.planner}
               onPlannerChange={(planner) => onUpdateSettings({ planner })}
             />
+            <section className="parent-section">
+              <h3 className="parent-section-title">Imię dziecka</h3>
+              <label className="parent-label" htmlFor="child-name">
+                Imię w dopełniaczu — tak będzie brzmieć tytuł i nazwa stacji:
+              </label>
+              <input
+                id="child-name"
+                type="text"
+                autoComplete="off"
+                maxLength={32}
+                value={settings.childName}
+                onChange={(event) =>
+                  onUpdateSettings({
+                    childName: normalizeChildName(event.target.value),
+                  })
+                }
+                className="parent-select"
+                aria-describedby="child-name-hint"
+              />
+              <p id="child-name-hint" className="parent-label mt-2">
+                Na przykład: „Mai”, „Artura”. Domyślnie: „dziecka”.
+              </p>
+            </section>
             <section className="parent-section">
               <h3 className="parent-section-title">Szybkie działania</h3>
               <div className="flex flex-wrap gap-2.5">
@@ -306,7 +330,9 @@ export function ParentModal({
             </section>
 
             <section className="parent-trust-box">
-              <h4 className="parent-trust-heading">O Małym pociągu Artura</h4>
+              <h4 className="parent-trust-heading">
+                O Małym pociągu {normalizeChildName(settings.childName)}
+              </h4>
               <p className="parent-trust-desc">
                 Aplikacja została zaprojektowana dla małych dzieci z myślą o
                 wyciszeniu i łagodnej stymulacji. Działa całkowicie lokalnie w

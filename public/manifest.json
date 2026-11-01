@@ -1,7 +1,7 @@
 {
-  "name": "Mały pociąg Artura",
+  "name": "Mały pociąg dziecka",
   "short_name": "Mały Pociąg",
-  "description": "Spokojna, bezdźwiękowa podróż małym pociągiem Artura sterowana jednym przyciskiem.",
+  "description": "Spokojna, bezdźwiękowa podróż małym pociągiem dziecka sterowana jednym przyciskiem.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

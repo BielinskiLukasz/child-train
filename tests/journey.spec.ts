@@ -100,6 +100,7 @@ test("reducer transitions are deterministic and reset preserves settings and jou
       weatherOverride: "snow",
       roundsBeforeRest: 2,
       playtimeLimitMinutes: 5,
+      childName: "Mai",
     },
   });
   state = { ...state, journeys: 3, isResting: true, restReason: "parent" };
@@ -109,6 +110,7 @@ test("reducer transitions are deterministic and reset preserves settings and jou
     plan: nextPlan,
   });
   expect(reset.settings).toEqual(state.settings);
+  expect(reset.settings.childName).toBe("Mai");
   expect(reset.journeys).toBe(3);
   expect(reset.plan).toEqual(nextPlan);
   expect(reset.isResting).toBe(false);
@@ -125,6 +127,53 @@ test("reducer transitions are deterministic and reset preserves settings and jou
   );
   expect(firstResult).toEqual(replayedResult);
   expect(firstResult.plan).toEqual(generateSessionPlan(() => 0.2));
+});
+
+test("the parent-selected child name updates the title and home station; the dedication stays fixed", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const world = page.locator("main");
+  await expect(page).toHaveTitle("Mały pociąg dziecka");
+  await expect(page.locator("h1")).toContainText("Mały pociąg dziecka");
+  await expect(page.locator(".intro-subtitle")).toContainText("Stacja dziecka");
+  await expect(page.locator(".footer-right")).toContainText(
+    "Z myślą o Arturze",
+  );
+
+  await page.keyboard.press("Escape");
+  await unlockParentGate(page);
+  await page.locator("#child-name").fill("Mai");
+  await page.locator(".parent-done-btn").click();
+
+  await expect(page).toHaveTitle("Mały pociąg Mai");
+  await expect(page.locator("h1")).toContainText("Mały pociąg Mai");
+  await expect(page.locator(".intro-subtitle")).toContainText("Stacja Mai");
+  await expect(page.locator(".world-illustration title")).toContainText(
+    "Stacja Mai",
+  );
+  await expect(
+    page.locator("svg text").filter({ hasText: "STACJA MAI" }),
+  ).toBeAttached();
+  await expect(page.locator(".footer-right")).toContainText(
+    "Z myślą o Arturze",
+  );
+  await expect(world).toHaveAttribute("data-phase", "waiting");
+});
+
+test("blank or whitespace-only child names fall back to 'dziecka'", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.keyboard.press("Escape");
+  await unlockParentGate(page);
+  await page.locator("#child-name").fill("   ");
+  await expect(page.locator("#child-name")).toHaveValue("dziecka");
+  await page.locator(".parent-done-btn").click();
+  await expect(page).toHaveTitle("Mały pociąg dziecka");
+  await expect(
+    page.locator("svg text").filter({ hasText: "STACJA DZIECKA" }),
+  ).toBeAttached();
 });
 
 test("the planner honours a parent's chosen conductor, passengers and stations", () => {
@@ -173,7 +222,7 @@ test("Enter is the main input, held keys are ignored, and a full journey can be 
   await page.clock.install();
   await page.goto("/");
   const world = page.locator("main");
-  await expect(page).toHaveTitle(/Artura/);
+  await expect(page).toHaveTitle("Mały pociąg dziecka");
 
   // The Enter button is the prominent action key
   await expect(page.locator("button.enter-key")).toBeVisible();
@@ -569,7 +618,7 @@ test("the single HTML file works offline without any remote requests", async ({
   page.on("pageerror", (error) => errors.push(error.message));
   await page.clock.install();
   await page.goto(`file://${resolve("dist/index.html")}`);
-  await expect(page.locator("h1")).toContainText("Artura");
+  await expect(page.locator("h1")).toContainText("dziecka");
   await page.keyboard.press("Enter");
   await collectFriend(page, 1);
   expect(remoteRequests).toEqual([]);
@@ -626,7 +675,9 @@ test.describe("the driver at Artur's station", () => {
     }
   });
 
-  test("steps out again when the journey returns home", async ({ page }) => {
+  test("steps out again when the journey returns home, new driver waits on station and boards on Enter", async ({
+    page,
+  }) => {
     // A whole round under a fake clock; allow extra wall time.
     test.slow();
     await page.clock.install();
@@ -636,6 +687,10 @@ test.describe("the driver at Artur's station", () => {
     const world = page.locator("main");
     const platform = page.locator(".platform-driver");
     const cab = page.locator(".cab-driver");
+    const initialDriver = await page
+      .locator(".intro-subtitle strong")
+      .first()
+      .textContent();
 
     for (let friend = 1; friend <= 3; friend++) {
       await page.keyboard.press("Enter");
@@ -648,12 +703,36 @@ test.describe("the driver at Artur's station", () => {
       await advance(page, "touring");
       await expect(world).toHaveAttribute("data-driver", "cab");
     }
+
+    // Pulling into Artur's station: new driver is already waiting on platform!
+    await expect(world).toHaveAttribute("data-phase", "returning");
+    await expect(page.locator(".platform-new-driver-waiting")).toHaveCount(1);
+
+    // Unboarding at Artur's station:
+    // Actual driver gets off the train, new driver is waiting on station.
     await advance(page, "returning");
+    await expect(world).toHaveAttribute("data-phase", "unboarding");
+    await expect(page.locator(".platform-driver-leaving")).toHaveCount(1);
+    await expect(page.locator(".platform-new-driver-waiting")).toHaveCount(1);
+
     await advance(page, "unboarding");
-    // Home: everyone gets off, driver included.
+    // Home: unboarding finished, now waiting for next journey with new driver!
+    await expect(world).toHaveAttribute("data-phase", "waiting");
     await expect(world).toHaveAttribute("data-driver", "outside");
     await expect(platform).toHaveCSS("opacity", "1");
     await expect(cab).toHaveCSS("opacity", "0");
+
+    const newDriver = await page
+      .locator(".intro-subtitle strong")
+      .first()
+      .textContent();
+    expect(newDriver).not.toBe(initialDriver);
+
+    // After Enter click, the new driver gets onto the train!
+    await page.keyboard.press("Enter");
+    await expect(world).toHaveAttribute("data-phase", "departing");
+    await expect(world).toHaveAttribute("data-driver", "cab");
+    await expect(cab).toHaveCSS("opacity", "1");
   });
 
   test("still changes place with reduced motion, just without the climb", async ({
@@ -677,96 +756,5 @@ test.describe("the driver at Artur's station", () => {
     await expect(world).toHaveAttribute("data-driver", "cab");
     await expect(page.locator(".cab-driver")).toHaveCSS("opacity", "1");
     await context.close();
-  });
-
-  test("hands over: the old driver leaves and a different one is already waiting", async ({
-    page,
-  }) => {
-    test.slow();
-    const errors: string[] = [];
-    page.on("pageerror", (error) => errors.push(error.message));
-    await page.clock.install();
-    await page.goto("/");
-    const world = page.locator("main");
-    await expect(world).toHaveAttribute("data-phase", "waiting");
-
-    const kindOf = (selector: string) =>
-      page.evaluate((sel) => {
-        const host = document.querySelector(sel);
-        const animal = host?.querySelector('[class*="animal--"]');
-        if (!animal) return null;
-        const cls = animal.getAttribute("class") ?? "";
-        return (
-          (cls.match(/animal--[a-z]+/) ?? [])[0]?.replace("animal--", "") ??
-          null
-        );
-      }, selector);
-
-    for (let friend = 1; friend <= 3; friend++) {
-      await page.keyboard.press("Enter");
-      await collectFriend(page, friend);
-    }
-    await page.keyboard.press("Enter");
-    await advance(page, "departing");
-    for (let scene = 0; scene < 3; scene++) await advance(page, "touring");
-
-    // Heading home: the current driver still has the controls, and the next
-    // driver is already standing on the platform.
-    await expect(world).toHaveAttribute("data-phase", "returning");
-    const outgoing = await kindOf(".cab-driver");
-    const incoming = await kindOf(".platform-driver");
-    expect(outgoing).not.toBeNull();
-    expect(incoming).not.toBeNull();
-    expect(incoming).not.toBe(outgoing);
-    await expect(world).toHaveAttribute("data-driver-next", incoming!);
-    // Nobody has stepped off yet.
-    await expect(page.locator(".leaving-driver")).toHaveCount(0);
-    await page.clock.runFor(PHASE_DURATION.returning + 10);
-
-    // The goodbye: the old driver is the one stepping down and walking off,
-    // and the waiting driver is unchanged — no silent swap on the platform.
-    await expect(world).toHaveAttribute("data-phase", "unboarding");
-    await expect(page.locator(".leaving-driver")).toHaveCount(1);
-    expect(await kindOf(".leaving-driver")).toBe(outgoing);
-    expect(await kindOf(".platform-driver")).toBe(incoming);
-    await expect(world).toHaveAttribute("data-driver-leaving", outgoing!);
-
-    // The outgoing figure is painted after the train, so the locomotive cannot
-    // hide it while it walks across.
-    const paintedAfterTrain = await page.evaluate(() => {
-      const train = document.querySelector(".train")!;
-      const leaving = document.querySelector(".leaving-driver")!;
-      return Boolean(
-        train.compareDocumentPosition(leaving) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
-      );
-    });
-    expect(paintedAfterTrain).toBe(true);
-
-    // The two figures never overlap while the old driver walks away.
-    await page.waitForTimeout(900);
-    const gap = await page.evaluate(() => {
-      const leaving = document
-        .querySelector(".leaving-driver")!
-        .getBoundingClientRect();
-      const waiting = document
-        .querySelector(".platform-driver")!
-        .getBoundingClientRect();
-      // The incoming driver waits to the left and the outgoing one walks
-      // further left, so the gap is measured from the right-hand figure.
-      return leaving.x - waiting.right;
-    });
-    expect(gap).toBeGreaterThan(0);
-
-    // Settled at home: only the incoming driver remains, and Enter boards them.
-    await page.clock.runFor(PHASE_DURATION.unboarding + 10);
-    await expect(world).toHaveAttribute("data-phase", "waiting");
-    await expect(world).toHaveAttribute("data-driver-leaving", "");
-    await expect(page.locator(".leaving-driver")).toHaveCount(0);
-    expect(await kindOf(".platform-driver")).toBe(incoming);
-    await page.keyboard.press("Enter");
-    await expect(world).toHaveAttribute("data-phase", "departing");
-    expect(await kindOf(".cab-driver")).toBe(incoming);
-    expect(errors).toEqual([]);
   });
 });
