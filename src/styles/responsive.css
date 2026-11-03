@@ -397,4 +397,11 @@
   .passenger--leaving {
     opacity: 0;
   }
+  /* The tiled layers land back where they started, but the location drift is
+     not a loop, so hold it at the authored position instead of leaving the
+     scene permanently offset. */
+  .scenery-parallax {
+    animation: none !important;
+    transform: none !important;
+  }
 }

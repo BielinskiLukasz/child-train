@@ -30,6 +30,19 @@
   animation-play-state: paused;
 }
 
+/* The location itself — hills, water, buildings — is the farthest depth, so it
+   drifts about eleven times more slowly than the tree line (≈2.9px/s against
+   33px/s). Amplitude stays well inside the ≥100px of artwork that every
+   landscape carries past each edge of the 1600-wide viewBox, and `alternate`
+   avoids needing to tile it. Linear, not eased: a steadily moving train should
+   produce a steady background, and the reversal is imperceptible at this rate.
+   Resting position is the authored 0, so a parked train shows the scene exactly
+   as drawn. */
+.scenery-parallax {
+  animation: location-drift 16s linear infinite alternate;
+  animation-play-state: paused;
+}
+
 .rail-sleepers {
   animation: track-pass 1.2s linear infinite;
   animation-play-state: paused;
@@ -43,7 +56,8 @@
 .is-moving .wheel-spin,
 .is-moving .parallax-trees,
 .is-moving .rail-sleepers,
-.is-moving .foreground-meadow {
+.is-moving .foreground-meadow,
+.is-moving .scenery-parallax {
   animation-play-state: running;
 }
 
@@ -281,6 +295,18 @@
 @keyframes scenery-pass {
   to {
     transform: translateX(1600px);
+  }
+}
+
+/* Same rightward direction as the tree line and meadow: the world slips past
+   while the train runs left. 46px of travel keeps every landscape's artwork
+   covering the full viewBox at both extremes of the sway. */
+@keyframes location-drift {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(46px);
   }
 }
 

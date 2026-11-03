@@ -77,16 +77,22 @@ export const Illustration = memo(function Illustration({
       <Cloud x={95} y={101} scale={0.95} delay="-8s" />
       <Cloud x={1019} y={79} scale={0.88} delay="-23s" />
       <Cloud x={1456} y={197} scale={0.72} delay="-14s" />
+      {/* The location itself is the farthest parallax depth, so it drifts with
+          the train — just far more slowly than the trees or the meadow. It gets
+          its own wrapper group because `.scenery` already carries a scaleY
+          transform at phone widths, and a CSS animation would replace it. */}
       <g clipPath="url(#scenery-clip)">
-        {leavingLandscape && (
-          <Scenery
-            key={`leaving-${leavingLandscape}`}
-            landscape={leavingLandscape}
-            active={false}
-            leaving
-          />
-        )}
-        <Scenery key={`active-${landscape}`} landscape={landscape} active />
+        <g className="scenery-parallax">
+          {leavingLandscape && (
+            <Scenery
+              key={`leaving-${leavingLandscape}`}
+              landscape={leavingLandscape}
+              active={false}
+              leaving
+            />
+          )}
+          <Scenery key={`active-${landscape}`} landscape={landscape} active />
+        </g>
       </g>
       <path
         d="M-100 430c268-51 403-12 676-14s440-47 683-13 309 22 441-5v242H-100Z"

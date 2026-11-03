@@ -268,7 +268,7 @@ test.describe("weather variety", () => {
 });
 
 test.describe("the world moves with the train", () => {
-  const LAYERS = [".foreground-meadow", ".parallax-trees"];
+  const LAYERS = [".foreground-meadow", ".parallax-trees", ".scenery-parallax"];
 
   test("sky phenomena stay put while the ground sweeps past", async ({
     page,
@@ -377,14 +377,94 @@ test.describe("the world moves with the train", () => {
       expect(await transform(layer)).not.toBe(moving[layer]);
     }
 
-    // The meadow and the tree line run at different depths, so they must not
-    // share a transform: that difference is what reads as distance.
+    // Three distinct depths, measured over the same interval: the foreground
+    // meadow rushes, the tree line sweeps, and the location itself barely
+    // creeps. That ordering is what reads as distance rather than one sheet
+    // of scenery sliding past.
     const tx = (m: string) => {
       const n = m.match(/-?[\d.]+/g);
       return n ? Number(n[4]) : 0;
     };
-    expect(tx(await transform(".foreground-meadow"))).not.toBe(
-      tx(await transform(".parallax-trees")),
+    const travelled: Record<string, number> = {};
+    for (const layer of LAYERS) {
+      travelled[layer] = Math.abs(
+        tx(await transform(layer)) - tx(moving[layer]),
+      );
+    }
+    expect(travelled[".foreground-meadow"]).toBeGreaterThan(
+      travelled[".parallax-trees"],
     );
+    expect(travelled[".parallax-trees"]).toBeGreaterThan(
+      travelled[".scenery-parallax"],
+    );
+    // Slow, but genuinely perceptible rather than a rounding error.
+    expect(travelled[".scenery-parallax"]).toBeGreaterThan(1);
+  });
+
+  test("the location drift never exposes a gap at either end of its sway", async ({
+    page,
+  }) => {
+    test.slow();
+    // A short wide viewport shows the whole 1600-wide viewBox, which is the
+    // worst case for edge coverage.
+    await page.setViewportSize({ width: 1920, height: 600 });
+    await page.goto("/");
+    await expect(page.locator("main")).toHaveAttribute("data-phase", "waiting");
+
+    for (const drift of [0, 46]) {
+      await page.addStyleTag({
+        content: `.scenery-parallax{animation:none!important;transform:translateX(${drift}px)!important;}`,
+      });
+      const coverage = await page.evaluate(() => {
+        const boxes = Array.from(
+          document.querySelectorAll<SVGGraphicsElement>(".scenery"),
+        ).map((el) => {
+          const box = el.getBBox();
+          const ctm = el.getCTM()!;
+          const left = new DOMPoint(box.x, 0).matrixTransform(ctm);
+          const right = new DOMPoint(box.x + box.width, 0).matrixTransform(ctm);
+          return { minX: left.x, maxX: right.x };
+        });
+        return {
+          leftmost: Math.max(...boxes.map((b) => b.minX)),
+          rightmost: Math.min(...boxes.map((b) => b.maxX)),
+          count: boxes.length,
+        };
+      });
+      expect(coverage.count).toBeGreaterThan(0);
+      // Artwork must still cover the full viewBox at both extremes of the sway.
+      expect(coverage.leftmost).toBeLessThanOrEqual(0);
+      expect(coverage.rightmost).toBeGreaterThanOrEqual(1600);
+      await page.reload();
+      await expect(page.locator("main")).toHaveAttribute(
+        "data-phase",
+        "waiting",
+      );
+    }
+  });
+
+  test("reduced motion holds the location at its authored position", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ reducedMotion: "reduce" });
+    const page = await context.newPage();
+    await page.goto("/");
+    await expect(page.locator("main")).toHaveAttribute("data-phase", "waiting");
+    await page.keyboard.press("Enter");
+    await expect(page.locator("main")).toHaveAttribute(
+      "data-phase",
+      "departing",
+    );
+    await page.waitForTimeout(2_600);
+    await expect(page.locator(".scenery-parallax")).toHaveCSS(
+      "animation-name",
+      "none",
+    );
+    // Not left permanently offset the way a finished non-looping animation would.
+    await expect(page.locator(".scenery-parallax")).toHaveCSS(
+      "transform",
+      "none",
+    );
+    await context.close();
   });
 });
