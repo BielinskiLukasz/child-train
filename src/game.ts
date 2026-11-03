@@ -12,6 +12,8 @@ export type Landscape =
   | "lavender"
   | "bridge";
 
+export type Destination = Exclude<Landscape, "home">;
+
 export type AnimalKind =
   | "rabbit"
   | "fox"
@@ -196,7 +198,7 @@ export const ALL_LOCATIONS: Record<Landscape, StopDefinition> = {
   },
 };
 
-export const DESTINATION_LOCATIONS: Landscape[] = [
+export const DESTINATION_LOCATIONS: Destination[] = [
   "forest",
   "village",
   "mountains",
@@ -272,6 +274,54 @@ export const defaultPlanner: JourneyPlanner = {
   stations: ["random", "random", "random"],
 };
 
+export const MIN_ALLOWED_ANIMALS = 4;
+export const MIN_ALLOWED_DESTINATIONS = 3;
+
+export interface AllowedContent {
+  allowedAnimals: readonly AnimalKind[];
+  allowedDestinations: readonly Destination[];
+}
+
+export const defaultAllowedContent: AllowedContent = {
+  allowedAnimals: [...ANIMAL_KEYS],
+  allowedDestinations: [...DESTINATION_LOCATIONS],
+};
+
+function availableValues<T>(values: readonly T[], catalog: readonly T[]): T[] {
+  return catalog.filter((value) => values.includes(value));
+}
+
+export function sanitizePlanner(
+  planner: JourneyPlanner,
+  content: AllowedContent,
+): JourneyPlanner {
+  const clean = <T extends string>(
+    picks: readonly PlannedPick<T>[],
+    allowed: readonly T[],
+  ): PlannedPick<T>[] => {
+    const used = new Set<T>();
+    return picks.map((pick) => {
+      if (pick === "random" || !allowed.includes(pick) || used.has(pick)) {
+        return "random";
+      }
+      used.add(pick);
+      return pick;
+    });
+  };
+  const [driver, ...passengers] = clean(
+    [planner.driver, ...planner.passengers],
+    content.allowedAnimals,
+  );
+  return {
+    driver,
+    passengers: passengers as JourneyPlanner["passengers"],
+    stations: clean<Landscape>(
+      planner.stations,
+      content.allowedDestinations,
+    ) as JourneyPlanner["stations"],
+  };
+}
+
 /**
  * Builds the next journey's plan. Explicit picks win; the remaining slots are
  * filled with random values that are guaranteed not to repeat an earlier slot
@@ -282,56 +332,63 @@ export function generateSessionPlan(
   random = Math.random,
   planner: JourneyPlanner = defaultPlanner,
   excludeDriver?: AnimalKind | null,
+  content: AllowedContent = defaultAllowedContent,
 ): SessionPlan {
-  /**
-   * Assigns one distinct value per slot. Explicit picks win, in order. A
-   * "random" slot is filled from the values that are (a) not already used and
-   * (b) not still needed by a LATER explicit slot, so a random fill can never
-   * steal a value a following pick was asking for. A pick that collides with an
-   * earlier assignment is treated as "random".
-   *
-   * If `excludeDriver` is provided, the driver slot will avoid that animal so
-   * the new driver waiting at Artur's station looks different from the one getting off.
-   */
-  const assign = <T>(
+  const animals = availableValues(content.allowedAnimals, ANIMAL_KEYS);
+  const destinations = availableValues(
+    content.allowedDestinations,
+    DESTINATION_LOCATIONS,
+  );
+  if (
+    animals.length < MIN_ALLOWED_ANIMALS ||
+    destinations.length < MIN_ALLOWED_DESTINATIONS
+  ) {
+    throw new RangeError(
+      "A journey needs four allowed animals and three destinations.",
+    );
+  }
+  const validPlanner = sanitizePlanner(planner, {
+    allowedAnimals: animals,
+    allowedDestinations: destinations,
+  });
+
+  const assign = <T extends string>(
     picks: readonly PlannedPick<T>[],
     all: readonly T[],
     excludeFirst?: T | null,
   ): T[] => {
-    const used = new Set<T>();
-    const result: T[] = [];
+    // Reserve every explicit pick before drawing random slots, including
+    // later passengers. Never expand the parent's allowed pool to fill a slot.
+    const used = new Set<T>(
+      picks.filter((pick): pick is T => pick !== "random"),
+    );
+    const result = picks.map((pick) => (pick === "random" ? null : pick));
     for (let i = 0; i < picks.length; i++) {
-      const pick = picks[i];
-      const reservedByLater = new Set(
-        picks.slice(i + 1).filter((later) => {
-          const laterPick = later as PlannedPick<T>;
-          return laterPick !== "random" && !used.has(laterPick as T);
-        }) as T[],
+      if (result[i] !== null) continue;
+      const available = all.filter((value) => !used.has(value));
+      const alternatives = available.filter(
+        (value) => i !== 0 || value !== excludeFirst,
       );
-      if (pick !== "random" && !used.has(pick as T)) {
-        result.push(pick as T);
-        used.add(pick as T);
-        continue;
-      }
-      const pool = all.filter(
-        (value) =>
-          !used.has(value) &&
-          !reservedByLater.has(value) &&
-          (i !== 0 || !excludeFirst || value !== excludeFirst),
-      );
-      const choice = pool[Math.floor(random() * pool.length)];
-      result.push(choice);
+      // Four allowed animals plus three pinned passengers may leave just the
+      // previous driver. Parent exclusions and pinned choices take precedence.
+      const pool = alternatives.length > 0 ? alternatives : available;
+      const roll = random();
+      const bounded = Number.isFinite(roll)
+        ? Math.max(0, Math.min(1 - Number.EPSILON, roll))
+        : 0;
+      const choice = pool[Math.floor(bounded * pool.length)];
+      result[i] = choice;
       used.add(choice);
     }
-    return result;
+    return result as T[];
   };
 
   const [driver, ...passengers] = assign<AnimalKind>(
-    [planner.driver, ...planner.passengers],
-    ANIMAL_KEYS,
-    planner.driver === "random" ? excludeDriver : null,
+    [validPlanner.driver, ...validPlanner.passengers],
+    animals,
+    excludeDriver,
   );
-  const tour = assign<Landscape>(planner.stations, DESTINATION_LOCATIONS);
+  const tour = assign<Landscape>(validPlanner.stations, destinations);
 
   const stops: StopDefinition[] = [
     ALL_LOCATIONS.home,
@@ -341,7 +398,7 @@ export function generateSessionPlan(
   return { driver, passengers, stops, tour };
 }
 
-export interface JourneySettings {
+export interface JourneySettings extends AllowedContent {
   /** Child's name in Polish genitive form, e.g. "dziecka", "Mai", "Artura". */
   childName: string;
   weatherOverride: "auto" | "clear" | "rain" | "snow" | "fog";
@@ -355,6 +412,7 @@ export interface JourneySettings {
 }
 
 export const defaultSettings: JourneySettings = {
+  ...defaultAllowedContent,
   childName: DEFAULT_CHILD_NAME,
   weatherOverride: "auto",
   timeOverride: "auto",
@@ -363,6 +421,47 @@ export const defaultSettings: JourneySettings = {
   pace: DEFAULT_PACE,
   planner: defaultPlanner,
 };
+
+export function updateJourneySettings(
+  settings: JourneySettings,
+  patch: Partial<JourneySettings>,
+): JourneySettings {
+  const candidateAnimals = availableValues(
+    patch.allowedAnimals ?? settings.allowedAnimals,
+    ANIMAL_KEYS,
+  );
+  const candidateDestinations = availableValues(
+    patch.allowedDestinations ?? settings.allowedDestinations,
+    DESTINATION_LOCATIONS,
+  );
+  const content: AllowedContent = {
+    allowedAnimals:
+      candidateAnimals.length >= MIN_ALLOWED_ANIMALS
+        ? candidateAnimals
+        : settings.allowedAnimals,
+    allowedDestinations:
+      candidateDestinations.length >= MIN_ALLOWED_DESTINATIONS
+        ? candidateDestinations
+        : settings.allowedDestinations,
+  };
+  const planChanged = changesJourneyPlan(patch);
+  return {
+    ...settings,
+    ...patch,
+    ...content,
+    planner: planChanged
+      ? sanitizePlanner(patch.planner ?? settings.planner, content)
+      : settings.planner,
+  };
+}
+
+export function changesJourneyPlan(patch: Partial<JourneySettings>): boolean {
+  return (
+    patch.planner !== undefined ||
+    patch.allowedAnimals !== undefined ||
+    patch.allowedDestinations !== undefined
+  );
+}
 
 export interface JourneyState {
   phase: Phase;
@@ -374,6 +473,7 @@ export interface JourneyState {
   plan: SessionPlan;
   nextPlan: SessionPlan | null;
   returningDriver: AnimalKind | null;
+  farewellPassengers: AnimalKind[];
   isResting: boolean;
   restReason: "rounds" | "playtime" | "parent" | null;
   settings: JourneySettings;
@@ -394,9 +494,10 @@ export function createInitialJourney(
     plan,
     nextPlan: null,
     returningDriver: null,
+    farewellPassengers: [],
     isResting: false,
     restReason: null,
-    settings: { ...settings },
+    settings: updateJourneySettings(defaultSettings, settings),
   };
 }
 
@@ -404,7 +505,11 @@ export type JourneyAction =
   | { type: "ENTER" }
   | { type: "ADVANCE"; nextPlan?: SessionPlan }
   | { type: "RESET_SESSION"; plan: SessionPlan }
-  | { type: "UPDATE_SETTINGS"; settings: Partial<JourneySettings> }
+  | {
+      type: "UPDATE_SETTINGS";
+      settings: Partial<JourneySettings>;
+      plan?: SessionPlan;
+    }
   | {
       type: "SET_REST";
       isResting: boolean;
@@ -435,6 +540,7 @@ export function journeyReducer(
                 ...state,
                 phase: "travelling",
                 stop: state.passengersCount + 1,
+                farewellPassengers: [],
               };
         case "travelling":
           return { ...state, phase: "arriving" };
@@ -462,6 +568,10 @@ export function journeyReducer(
             phase: "unboarding",
             returningDriver: state.returningDriver ?? state.plan.driver,
             nextPlan: action.nextPlan ?? state.nextPlan ?? null,
+            farewellPassengers: state.plan.passengers.slice(
+              0,
+              state.passengersCount,
+            ),
           };
         case "unboarding": {
           const nextPlan = action.nextPlan ?? state.nextPlan ?? state.plan;
@@ -493,12 +603,18 @@ export function journeyReducer(
       return createInitialJourney(action.plan, state.settings, state.journeys);
     }
     case "UPDATE_SETTINGS": {
+      const planChanged = changesJourneyPlan(action.settings);
       return {
         ...state,
-        settings: {
-          ...state.settings,
-          ...action.settings,
-        },
+        settings: updateJourneySettings(state.settings, action.settings),
+        plan:
+          planChanged &&
+          state.phase === "waiting" &&
+          state.stop === 0 &&
+          action.plan
+            ? action.plan
+            : state.plan,
+        nextPlan: planChanged ? null : state.nextPlan,
       };
     }
     case "SET_REST": {
@@ -598,7 +714,7 @@ export function journeyMessage(state: JourneyState): string {
     case "returning":
       return `Wracamy do ${currentStop(state).name}. Dobrze było być razem.`;
     case "unboarding":
-      return "Do zobaczenia, kochani przyjaciele!";
+      return "Przyjaciele machają z peronu. Do zobaczenia!";
     default:
       return state.isTour
         ? "Koła się toczą. Wszyscy razem podziwiamy świat."
@@ -610,6 +726,12 @@ export function journeyMessage(state: JourneyState): string {
 export function journeyAriaAnnouncement(state: JourneyState): string {
   if (state.isResting) {
     return "Pora na odpoczynek. Pociąg śpi pod gwiazdami.";
+  }
+  if (state.phase === "unboarding") {
+    const friends = state.farewellPassengers
+      .map((kind) => ALL_ANIMALS[kind].name)
+      .join(", ");
+    return `Pociąg stoi na stacji. ${friends ? `${friends} machają na pożegnanie z peronu.` : "Przyjaciele żegnają się."} Przycisk będzie dostępny po pożegnaniu.`;
   }
   const message = journeyMessage(state);
   const teaser = nextStopTeaser(state);

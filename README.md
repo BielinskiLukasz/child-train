@@ -16,7 +16,7 @@ The weather and time of day are randomized upon session start and evolve dynamic
 2. **First Pickup:** Pressing `Enter` (or tapping the on-screen button) makes the conductor climb back into the cab before the train starts a slow trip to the first destination station, where the first passenger boards a carriage and waves.
 3. **Subsequent Pickups:** The train waits indefinitely at each stop. Pressing `Enter` advances to the next two stations, picking up two more unique animal friends so all three carriages are full.
 4. **Scenic Tour:** With all passengers aboard, the next `Enter` begins a scenic tour through three randomized landscapes under smooth sky and weather transitions.
-5. **Return & Farewell:** The train returns to _Stacja dziecka_ where the new conductor is already waiting on the station platform. As the train stops, the passenger friends and the actual train driver get off the train onto the platform, waving goodbye. The new conductor takes over on the platform, ready to board the train after Enter is pressed.
+5. **Return & Farewell:** The train returns to _Stacja dziecka_ where the next conductor waits. The three actual passengers leave their windows one by one, settle onto the platform, and wave goodbye beside the returning driver. They keep their identities even when the next journey's roster is prepared. The three friends stay on the platform while the train waits and wave as it departs after Enter; they move away with the station, not with the train. The next conductor boards only after Enter is pressed.
 6. **Rest Screen:** After $N$ complete rounds (default: 4, or triggered manually via parent controls), a peaceful _"Pora na odpoczynek"_ sleeping-moon screen offers a calm transition to rest.
 
 ## Cast & Map
@@ -51,14 +51,26 @@ Leśna Polana · Słoneczna Wieś · Górska Dolina · Nadbrzeże Rzeki · Brzoz
 
 - **Parent Value Strip:** A subtle top banner informs supervising adults of the app's safety guarantees (`Bez dźwięku · Bez reklam · Bez internetu · Jedna interakcja · Nic nie wychodzi z urządzenia`).
 - **Parent Escape Hatch & Gate:** Long-pressing the sun brand mark for 3 seconds, clicking the gear icon (`⚙`), or pressing `Escape` opens a changing addition challenge. The answer is never revealed after a wrong attempt. This is a child-resistant convenience gate, not account authentication.
-- **Parent Settings:**
-  - **Imię dziecka:** Enter the child's name in Polish genitive form (default: _dziecka_; for example _Mai_ or _Artura_). This immediately updates the in-app title, home-station name, browser-tab title, scene description, and screen-reader labels. It is kept in memory for this session only; the footer dedication _"Z myślą o Arturze"_ stays fixed.
-  - **Plan the next journey** ("Plan podróży"): choose which animal drives (Maszynista), which three animals ride the carriages (Pasażer 1–3), and which three stations the train visits (Stacja 1–3). Every slot defaults to _"Losowo"_ (random). A value already chosen in another slot is offered disabled, so no friend or stop can be booked twice; a random slot is filled from the remaining friends and never steals a value a later slot asked for. "Wszystko losowo" clears the plan. Picks apply from the **next** journey (after returning home or "Nowa podróż").
-  - Reset the session immediately with a newly randomized (or planned) conductor, passengers, and station order.
-  - Trigger the _"Pora na odpoczynek"_ rest screen on demand or configure how many rounds occur before automatic rest. Waking the train requires passing the parent gate again.
-  - Set an active, visible-session playtime limit (default: 20 minutes). An hourglass appears without a numeric countdown; at the limit the rest screen opens. A parent can approve one continuation from the gated settings.
-  - Lock atmosphere overrides for soothing sessions (e.g. _Zawsze noc_, _Zawsze dzień_, _Cichy śnieg_, _Spokojny deszcz_, _Lekka mgła_).
-  - **Pace** ("Tempo podróży"): _Bardzo spokojne_ (1.45×), _Spokojne_ (1.2×), _Zwykłe_ (1×, default) or _Żywe_ (0.8×). Every phase is scaled by the same factor, so the proportions of a round never change and the atmosphere maths stays valid at any pace. The change applies immediately; the train still waits at stations for as long as the child needs.
+
+### Parent Settings
+
+- **Imię dziecka:** Enter the child's name in Polish genitive form (default: _dziecka_; for example _Mai_ or _Artura_). This immediately updates the in-app title, home-station name, browser-tab title, scene description, and screen-reader labels. It is kept in memory for this session only; the footer dedication _"Z myślą o Arturze"_ stays fixed.
+- **Allowed animals and destinations** ("Dozwolone zwierzątka i miejsca"): expand the list to exclude animals or places from future plans. At least **four distinct animals** and **three distinct destinations** must remain enabled. The home station always remains. Excluded choices are unavailable in manual slots, and any existing pin for an excluded item becomes _Losowo_. The current journey and its farewell are not replaced mid-trip. Separate "Włącz wszystkie" buttons restore the full lists without resetting other settings.
+- **Plan the next journey** ("Plan podróży"): choose the conductor, three passengers, and three destinations from the allowed lists. All slots default to _Losowo_. Explicit choices are reserved before random slots are filled, so a random choice cannot steal a later pinned choice. "Wszystko losowo" clears only the pins, never the allowed lists. At the home station changes update the ready plan immediately. During travel they apply to the next round; "Nowa podróż" starts a fresh plan immediately while preserving the child name, settings, and completed-journey count.
+- **Built-in journeys** ("Gotowe podróże"): choose a preset and press **Użyj zestawu**. This fills the planner, pace, weather, and time of day without starting the train. Personalization, allowed lists, playtime limits, and rest intervals stay unchanged. Route/roster changes follow the same next-round rules as the planner; atmosphere and pace changes apply immediately. A preset requiring excluded choices is clearly explained and cannot be applied. Nothing is downloaded or unlocked.
+- **Rest:** trigger _"Pora na odpoczynek"_ or configure the round interval. Waking the train requires passing the parent gate again.
+- **Playtime:** set a visible-session limit (default: 20 minutes). The hourglass has no numeric countdown; the rest screen opens at the limit. A parent can approve an additional configured time window.
+- **Atmosphere:** lock the weather or time of day for soothing sessions, for example _Zawsze noc_ or _Cichy śnieg_.
+- **Pace** ("Tempo podróży"): _Bardzo spokojne_ (1.45×), _Spokojne_ (1.2×), _Zwykłe_ (1×, default), or _Żywe_ (0.8×). These multiply phase durations, so larger values mean slower travel. Changing the pace preserves the distance already covered in a leg. The train still waits for as long as the child needs.
+
+| Built-In Journey | Conductor And Friends             | Route                                         | Atmosphere And Pace              |
+| ---------------- | --------------------------------- | --------------------------------------------- | -------------------------------- |
+| Przez las i sad  | Lisek; Jeżyk, Wiewiórka, Myszka   | Leśna Polana, Stary Sad, Szepcząca Łąka       | Clear daytime, normal pace       |
+| Zimowa podróż    | Miś; Króliczek, Jelonek, Owieczka | Śnieżna Polana, Górska Dolina, Brzozowy Gaj   | Snowy daytime, calm pace         |
+| Spokojny wieczór | Sówka; Miś, Króliczek, Żółwik     | Ciche Jezioro, Lawendowe Pole, Słoneczna Wieś | Clear night, very calm pace      |
+| Losowa podróż    | Random, from allowed animals only | Random, from allowed destinations only        | Dynamic sky/weather, normal pace |
+
+The generator tries to choose a different incoming conductor. With only four allowed animals and three pinned passengers, the current driver may be the only valid conductor; parent exclusions and pinned choices take precedence over a driver change. Settings and presets are session-only, with no persistent storage or new child controls.
 
 ## Phones, Tablets & PWA
 
@@ -232,11 +244,13 @@ The generated `dist/index.html` bundles the complete application, SVG illustrati
 ## Implementation
 
 - `src/App.tsx`: keyboard/touch handling, parent gate trigger, rest screen, and page layout.
-- `src/game.ts`: finite-state machine, the journey planner (conductor / passengers / stations, with a no-repeat assignment), the session randomizer (16 animals, 11 destinations), pace presets, and Polish copy.
+- `src/game.ts`: pure state machine, restricted no-repeat plan generator, allowed-pool validation, retained farewell passengers, pace presets, and Polish copy. Random plans are generated outside the reducer and passed through actions.
+- `src/journeyPresets.ts`: bundled story definitions and conflict checks; applying a preset never changes exclusions, personalization, or playtime settings.
 - `src/atmosphere.ts`: road-progress weather/time engine, seamless 24-hour colour interpolation, the four-season palette blend, and the per-session moon phase.
 - `src/components/Atmosphere.tsx` & `src/atmosphere.css`: sun, moon and its phase mask, stars, and the rain/snow/fog layers.
 - `src/components/illustration/`: modular SVG art — `Scenery` (11 landscapes plus the shared prop kit), `Animal` (16 species, one template), `Train`, `Station` (including the clock driven by `--day-hour`) and `Meadow` (parallax foreground). Only the active and crossfading landscapes are mounted, and the whole scene is memoised so the once-a-second playtime tick does not rebuild it.
-- `src/components/ParentModal.tsx` & `src/components/ParentValueStrip.tsx`: parent trust banner and gated settings modal (journey planner, pace, playtime, atmosphere locks).
+- `src/components/ParentModal.tsx`, `src/components/JourneyOptions.tsx`, and `src/components/ParentValueStrip.tsx`: gated settings, accessible content-pool checkboxes, preset preview/application, and parent trust banner.
+- `src/components/illustration/PlatformFarewell.tsx`: the returning three passengers, attached to the station with staggered, pace-scaled entrances and gentle waves. Reduced motion keeps them visible without the entrance movement.
 - `src/components/RestScreen.tsx`: calm sleeping-moon rest overlay, dismissible only through the parent gate.
 - `src/hooks/useAtmosphere.ts`, `src/hooks/useJourneyClock.ts`, `src/hooks/useActivePlaytime.ts` and `src/hooks/useModalFocus.ts`: DOM-variable atmosphere renderer, visibility-aware journey and playtime clocks, and native-dialog focus management.
 - `src/styles/`: split tokens, layout, animations, dialogs, and responsive rules.
@@ -254,6 +268,8 @@ npm test
 ```
 
 Automated Chromium tests verify the state machine and pure reducer replay, settings preservation on reset, the no-repeat journey planner, single-control input latching, emulated phone touch taps, sideways phone layout, three-second parent hold, dynamic parent challenge, focus restoration, parent-gated rest, the active playtime limit and its one approved continuation, the pace setting scaling real leg timing, dynamic Journey 1 atmosphere, the season drift and its seamless round boundary, per-session moon phase, station clock hands matching the simulated hour, passenger mood reactions, that the sky never parallaxes while the ground sweeps at two distinct depths and freezes at rest, hidden-tab pause/resume, reduced-motion fallback, bounded crossfading scenery, service-worker offline shell caching, and zero-network offline execution from `dist/index.html`.
+
+`tests/parent-journeys.spec.ts` adds restricted-pool generation across many seeds, minimum-pool guards, explicit-pick reservations, exclusion-aware presets, settings preservation, mobile parent controls, mid-trip edits without clock rewinds, and the identity/lifecycle of the three friends waving on the platform (including reduced motion).
 
 ## Credits
 

@@ -7,6 +7,7 @@ import {
   PACE_PRESETS,
   defaultPlanner,
   type AnimalKind,
+  type AllowedContent,
   normalizeChildName,
   type JourneyPlanner,
   type JourneySettings,
@@ -15,6 +16,7 @@ import {
   type PlannedPick,
 } from "../game";
 import { useModalFocus } from "../hooks/useModalFocus";
+import { AllowedContentSettings, JourneyPresets } from "./JourneyOptions";
 
 function makeParentQuestion() {
   const first = 2 + Math.floor(Math.random() * 8);
@@ -136,8 +138,17 @@ export function ParentModal({
           </form>
         ) : (
           <div className="parent-settings-content space-y-5">
+            <JourneyPresets
+              settings={settings}
+              onUpdateSettings={onUpdateSettings}
+            />
+            <AllowedContentSettings
+              settings={settings}
+              onUpdateSettings={onUpdateSettings}
+            />
             <PlannerSection
               planner={settings.planner}
+              content={settings}
               onPlannerChange={(planner) => onUpdateSettings({ planner })}
             />
             <section className="parent-section">
@@ -365,9 +376,11 @@ export function ParentModal({
  */
 function PlannerSection({
   planner,
+  content,
   onPlannerChange,
 }: {
   planner: JourneyPlanner;
+  content: AllowedContent;
   onPlannerChange: (planner: JourneyPlanner) => void;
 }) {
   const setDriver = (value: PlannedPick<AnimalKind>) =>
@@ -402,9 +415,10 @@ function PlannerSection({
     <section className="parent-section">
       <h3 className="parent-section-title">Plan podróży</h3>
       <p className="parent-label mb-2">
-        Wybierz, kto poprowadzie pociąg i kto pojedzie, oraz do jakich trzech
-        stacji zajedzie. Wybory zadziałają od kolejnej podróży (po powrocie do
-        domu lub po „Nowa podróż”).
+        Wybierz maszynistę, trzech pasażerów i trzy stacje. Na stacji
+        początkowej wybory zmieniają plan od razu. Podczas jazdy dotyczą
+        następnej rundy; „Nowa podróż” pozwala zacząć wcześniej. Wykluczone
+        wybory są nieaktywne.
       </p>
 
       <label className="parent-label" htmlFor="planner-driver">
@@ -418,13 +432,19 @@ function PlannerSection({
       >
         <option value="random">Losowo</option>
         {ANIMAL_KEYS.map((kind) => (
-          <option key={kind} value={kind} disabled={animalTakenBy(0)(kind)}>
+          <option
+            key={kind}
+            value={kind}
+            disabled={
+              !content.allowedAnimals.includes(kind) || animalTakenBy(0)(kind)
+            }
+          >
             {ALL_ANIMALS[kind].name}
           </option>
         ))}
       </select>
 
-      <div className="mt-3 grid grid-cols-3 gap-2">
+      <div className="planner-slots mt-3">
         {planner.passengers.map((pick, index) => (
           <div key={index}>
             <label
@@ -449,7 +469,10 @@ function PlannerSection({
                 <option
                   key={kind}
                   value={kind}
-                  disabled={animalTakenBy(index + 1)(kind)}
+                  disabled={
+                    !content.allowedAnimals.includes(kind) ||
+                    animalTakenBy(index + 1)(kind)
+                  }
                 >
                   {ALL_ANIMALS[kind].name}
                 </option>
@@ -459,7 +482,7 @@ function PlannerSection({
         ))}
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-2">
+      <div className="planner-slots mt-3">
         {planner.stations.map((pick, index) => (
           <div key={index}>
             <label
@@ -484,7 +507,10 @@ function PlannerSection({
                 <option
                   key={location}
                   value={location}
-                  disabled={stationTakenBy(index)(location)}
+                  disabled={
+                    !content.allowedDestinations.includes(location) ||
+                    stationTakenBy(index)(location)
+                  }
                 >
                   {ALL_LOCATIONS[location].name}
                 </option>

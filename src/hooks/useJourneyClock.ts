@@ -6,12 +6,23 @@ export type PhaseClock = { read: () => number };
 /** One visibility-aware clock shared by the story and its atmosphere. */
 export function useJourneyClock(journey: JourneyState, onAdvance: () => void) {
   const clock = useRef<PhaseClock>({ read: () => 0 });
+  const advanceRef = useRef(onAdvance);
+  const paceRef = useRef(journey.settings.pace);
+  const changePace = useRef<((pace: number) => void) | null>(null);
+
+  useLayoutEffect(() => {
+    advanceRef.current = onAdvance;
+    paceRef.current = journey.settings.pace;
+  }, [onAdvance, journey.settings.pace]);
+
   useLayoutEffect(() => {
     clock.current = { read: () => 0 };
+    changePace.current = null;
     if (journey.phase === "waiting") return;
+    const phase = journey.phase;
 
     // The parent pace setting scales every phase by the same factor.
-    const duration = phaseDuration(journey.phase, journey.settings.pace);
+    let duration = phaseDuration(phase, paceRef.current);
     let elapsed = 0;
     let startedAt = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -30,7 +41,7 @@ export function useJourneyClock(journey: JourneyState, onAdvance: () => void) {
         elapsed = duration;
         clearTimeout(timer);
         timer = undefined;
-        onAdvance();
+        advanceRef.current();
       }, duration - elapsed);
     };
     const pause = () => {
@@ -43,12 +54,25 @@ export function useJourneyClock(journey: JourneyState, onAdvance: () => void) {
       if (document.hidden) pause();
       else resume();
     };
+    changePace.current = (pace) => {
+      // Parent presets may change speed mid-leg: keep distance already covered.
+      const progress = read();
+      pause();
+      duration = phaseDuration(phase, pace);
+      elapsed = progress * duration;
+      if (!document.hidden && progress < 1) resume();
+    };
     if (!document.hidden) resume();
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
       clearTimeout(timer);
+      changePace.current = null;
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [journey.phase, journey.tourIndex, journey.settings.pace, onAdvance]);
+  }, [journey.phase, journey.tourIndex]);
+
+  useLayoutEffect(() => {
+    changePace.current?.(journey.settings.pace);
+  }, [journey.settings.pace]);
   return clock;
 }

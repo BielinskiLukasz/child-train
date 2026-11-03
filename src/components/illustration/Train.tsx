@@ -85,7 +85,8 @@ export function Carriage({
               className={`passenger ${justBoarded ? "passenger--boarding" : ""} ${journey.phase === "unboarding" ? "passenger--leaving" : ""}`}
               style={
                 {
-                  "--passenger-delay": `${index * 0.3}s`,
+                  "--passenger-delay": `${index * 0.28 * journey.settings.pace}s`,
+                  "--disembark-duration": `${0.9 * journey.settings.pace}s`,
                 } as CSSProperties
               }
             >

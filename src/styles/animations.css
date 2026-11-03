@@ -68,8 +68,36 @@
 }
 
 .passenger--leaving {
-  animation: passenger-leave 1.4s var(--passenger-delay, 0s) ease-in-out
-    forwards;
+  animation: passenger-leave var(--disembark-duration, 0.9s)
+    var(--passenger-delay, 0s) ease-in-out forwards;
+}
+
+.platform-farewell-friend {
+  opacity: 1;
+}
+
+.platform-farewell-friend--arriving {
+  animation: platform-farewell-arrive var(--farewell-duration, 0.8s)
+    var(--farewell-delay, 0.95s) ease-out both;
+}
+
+@keyframes platform-farewell-arrive {
+  from {
+    opacity: 0;
+    transform: translate(28px, -10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .platform-farewell-friend--arriving {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .waving-paw {

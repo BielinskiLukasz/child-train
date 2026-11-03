@@ -56,6 +56,9 @@ export const Illustration = memo(function Illustration({
       <desc id="scene-description">
         Pastelowa lokomotywa prowadzona przez maszynistę {driverAnimal.name} i
         trzy kolorowe wagoniki. W podróży towarzyszą przyjaciele zwierzątka.
+        {journey.stop === 0 && journey.farewellPassengers.length > 0
+          ? ` ${journey.farewellPassengers.map((kind) => ALL_ANIMALS[kind].name).join(", ")} machają na pożegnanie z peronu.`
+          : ""}
       </desc>
       <desc id="sky-description">
         Pogoda i pora dnia otulają spokojną podróż.

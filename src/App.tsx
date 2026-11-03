@@ -26,6 +26,8 @@ import {
   journeyAriaAnnouncement,
   ALL_ANIMALS,
   normalizeChildName,
+  changesJourneyPlan,
+  updateJourneySettings,
   type JourneySettings,
 } from "./game";
 
@@ -205,6 +207,7 @@ export default function App() {
           Math.random,
           journey.settings.planner,
           journey.plan.driver,
+          journey.settings,
         ))
       : undefined;
 
@@ -219,6 +222,8 @@ export default function App() {
     journey.plan.driver,
     journey.nextPlan,
     journey.settings.planner,
+    journey.settings.allowedAnimals,
+    journey.settings.allowedDestinations,
   ]);
   const clock = useJourneyClock(journey, advancePhase);
   const initialConditions = useAtmosphere(journey, clock, world);
@@ -258,12 +263,28 @@ export default function App() {
   const handleResetSession = () => {
     dispatch({
       type: "RESET_SESSION",
-      plan: generateSessionPlan(Math.random, journey.settings.planner),
+      plan: generateSessionPlan(
+        Math.random,
+        journey.settings.planner,
+        null,
+        journey.settings,
+      ),
     });
   };
 
   const handleUpdateSettings = (newSettings: Partial<JourneySettings>) => {
-    dispatch({ type: "UPDATE_SETTINGS", settings: newSettings });
+    const updated = updateJourneySettings(journey.settings, newSettings);
+    const atHome = journey.phase === "waiting" && journey.stop === 0;
+    const plan =
+      atHome && changesJourneyPlan(newSettings)
+        ? generateSessionPlan(
+            Math.random,
+            updated.planner,
+            journey.returningDriver,
+            updated,
+          )
+        : undefined;
+    dispatch({ type: "UPDATE_SETTINGS", settings: newSettings, plan });
   };
 
   const handleTriggerRest = () => {

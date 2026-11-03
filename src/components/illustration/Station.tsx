@@ -1,5 +1,6 @@
 import { currentStop, driverIsOutside, type JourneyState } from "../../game";
 import { Animal } from "./Animal";
+import { PlatformFarewell } from "./PlatformFarewell";
 
 export function Station({ journey }: { journey: JourneyState }) {
   const { phase, stop } = journey;
@@ -181,7 +182,7 @@ export function Station({ journey }: { journey: JourneyState }) {
       {stop === 0 &&
         (phase === "returning" || phase === "unboarding") &&
         journey.nextPlan && (
-          <g transform="translate(250 424) scale(.5)">
+          <g transform="translate(170 424) scale(.45)">
             <g className="platform-new-driver-waiting">
               <Animal kind={journey.nextPlan.driver} conductor />
             </g>
@@ -210,6 +211,16 @@ export function Station({ journey }: { journey: JourneyState }) {
           </g>
         </g>
       )}
+      {stop === 0 &&
+        (phase === "unboarding" ||
+          phase === "waiting" ||
+          phase === "departing") && (
+          <PlatformFarewell
+            passengers={journey.farewellPassengers}
+            arriving={phase === "unboarding"}
+            pace={journey.settings.pace}
+          />
+        )}
       <g transform="translate(316 280)">
         <path d="M-8 2q2-12 12-9 8 1 6 10l8 3-10 1q-9 9-16-5Z" fill="#6f8b76" />
         <path d="m-7 1-8-3 5 7" fill="#6f8b76" />
